@@ -2,7 +2,7 @@ from aiogram.dispatcher.filters.state import State, StatesGroup
 
 
 class RequestForm(StatesGroup):
-    manager_phone = State()
+    manager_name = State()
     contact_name = State()
     phone = State()
     address = State()
