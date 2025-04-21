@@ -19,3 +19,4 @@ pytz==2025.2
 yarl==1.18.3
 gspread
 oauth2client
+googleapiclient
