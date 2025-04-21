@@ -2,7 +2,6 @@ import os
 import time
 import logging
 import re
-from datetime import datetime
 from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import State, StatesGroup
@@ -17,6 +16,11 @@ from googleapiclient.errors import HttpError
 from data.config import GOOGLE_CREDENTIALS_FILE, SPREADSHEET_ID, SHEET_NAME, DRIVE_FOLDER_ID
 from loader import dp, bot
 from states.Tok_Uchun import RequestForm
+from datetime import datetime
+import pytz
+
+# Asia/Tashkent vaqt zonasi
+tz = pytz.timezone('Asia/Tashkent')
 
 # Список администраторов
 ADMINS = [973358587]
@@ -305,7 +309,7 @@ async def process_photo(message: types.Message, state: FSMContext):
             os.remove(temp_file)
 
         # Форматирование текущего времени
-        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        current_time = datetime.now(tz)
 
         # Запись данных в Google Sheets
         try:
