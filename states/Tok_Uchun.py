@@ -1,11 +1,15 @@
-from aiogram.dispatcher.filters.state import StatesGroup,State
+from aiogram.dispatcher.filters.state import State, StatesGroup
 
 
 class RequestForm(StatesGroup):
+    manager_phone = State()
     contact_name = State()
     phone = State()
     address = State()
     cadastr_number = State()
-    transformer_info = State()
+    has_transformer = State()
+    transformer_power = State()
+    free_power = State()
+    station = State()
     location = State()
     photo = State()
