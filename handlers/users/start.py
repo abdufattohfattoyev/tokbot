@@ -309,7 +309,7 @@ async def process_photo(message: types.Message, state: FSMContext):
             os.remove(temp_file)
 
         # Форматирование текущего времени
-        current_time = datetime.now(tz)
+        current_time = datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
 
         # Запись данных в Google Sheets
         try:
