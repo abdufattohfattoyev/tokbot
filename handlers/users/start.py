@@ -16,6 +16,8 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from googleapiclient.errors import HttpError
 
+tz = pytz.timezone('Asia/Tashkent')
+
 from data.config import GOOGLE_CREDENTIALS_FILE, SPREADSHEET_ID, SHEET_NAME, DRIVE_FOLDER_ID
 from loader import dp, bot
 from states.Tok_Uchun import RequestForm
@@ -23,10 +25,8 @@ from states.Tok_Uchun import RequestForm
 # Список администраторов
 ADMINS = [973358587]
 
-tz = pytz.timezone('Asia/Tashkent')
 # Настройки логирования
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
 
 # Подключение к Google Sheets
 def connect_to_google_sheets():
@@ -40,7 +40,6 @@ def connect_to_google_sheets():
         logging.error(f"Ошибка подключения к Google Sheets: {str(e)}")
         raise
 
-
 # Подключение к Google Drive
 def connect_to_google_drive():
     try:
@@ -52,7 +51,6 @@ def connect_to_google_drive():
         logging.error(f"Ошибка подключения к Google Drive: {str(e)}")
         raise
 
-
 # Проверка существования папки
 def check_folder_exists(drive_service, folder_id):
     try:
@@ -63,8 +61,6 @@ def check_folder_exists(drive_service, folder_id):
         logging.error(f"Папка с ID {folder_id} не найдена: {str(e)}")
         return False
 
-
-# Создание новой папки
 def create_drive_folder(drive_service, folder_name):
     try:
         file_metadata = {
@@ -82,7 +78,6 @@ def create_drive_folder(drive_service, folder_name):
     except HttpError as e:
         logging.error(f"Ошибка создания папки: {str(e)}")
         return None
-
 
 # Загрузка файла в Google Drive
 def upload_to_drive(file_path):
@@ -117,21 +112,18 @@ def upload_to_drive(file_path):
         logging.error(f"Общая ошибка: {str(e)}")
         return None
 
-
 # Клавиатура для местоположения
 def get_location_keyboard():
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
     keyboard.add(KeyboardButton("📍 Отправить местоположение", request_location=True))
     return keyboard
 
-
 # Inline-кнопки для кадастрового номера (есть/нет)
 def get_cadastr_keyboard():
     keyboard = InlineKeyboardMarkup()
-    keyboard.add(InlineKeyboardButton("✅ Кадастровый есть", callback_data="cadastr_yes"))
-    keyboard.add(InlineKeyboardButton("❌ Кадастровый нет", callback_data="cadastr_no"))
+    keyboard.add(InlineKeyboardButton("✅ Кадастр есть", callback_data="cadastr_yes"))
+    keyboard.add(InlineKeyboardButton("❌ Кадастр нет", callback_data="cadastr_no"))
     return keyboard
-
 
 # Inline-кнопки для трансформатора (есть/нет)
 def get_transformer_keyboard():
@@ -140,20 +132,17 @@ def get_transformer_keyboard():
     keyboard.add(InlineKeyboardButton("❌ Трансформатор нет", callback_data="transformer_no"))
     return keyboard
 
-
 # Inline-кнопка для начала запроса
 def get_request_button():
     keyboard = InlineKeyboardMarkup()
     keyboard.add(InlineKeyboardButton("📝 Запрос отправить", callback_data="start_request"))
     return keyboard
 
-
 # Inline-кнопка для перезапуска
 def get_restart_button():
     keyboard = InlineKeyboardMarkup()
     keyboard.add(InlineKeyboardButton("🔄 Начать заново", callback_data="restart_request"))
     return keyboard
-
 
 # Inline-кнопки для выбора станции
 def get_station_keyboard():
@@ -164,7 +153,6 @@ def get_station_keyboard():
     keyboard.add(InlineKeyboardButton("120кВт", callback_data="station_120kwt"))
     keyboard.add(InlineKeyboardButton("160кВт", callback_data="station_160kwt"))
     return keyboard
-
 
 # Команда /start
 @dp.message_handler(CommandStart())
@@ -178,54 +166,40 @@ async def bot_start(message: types.Message):
     )
     logging.info(f"Новый пользователь: {message.from_user.id} - {message.from_user.full_name}")
 
-
 # Обработка inline-кнопки для начала запроса
 @dp.callback_query_handler(lambda c: c.data == "start_request")
 async def start_request_callback(callback: types.CallbackQuery):
-    await RequestForm.manager_phone.set()
+    await RequestForm.manager_name.set()
     await callback.message.answer(
-        "<b>Пожалуйста, введите ваш номер телефона менеджера</b> (например, +998901234567 или 901234567):",
+        "<b>Пожалуйста, введите имя менеджера:</b>",
         parse_mode="HTML"
     )
     await callback.message.delete()
     logging.info(f"Пользователь {callback.from_user.id} начал запрос")
 
-
-# Номер телефона менеджера
-@dp.message_handler(state=RequestForm.manager_phone)
-async def process_manager_phone(message: types.Message, state: FSMContext):
-    phone = message.text
-    if not (re.match(r'^\+998[0-9]{9}$', phone) or re.match(r'^[0-9]{9}$', phone)):
-        await message.reply(
-            "<b>Пожалуйста, введите телефон в правильном формате</b> (например, +998901234567 или 901234567):",
-            parse_mode="HTML"
-        )
-        logging.warning(f"Пользователь {message.from_user.id} ввел неверный формат телефона менеджера: {phone}")
-        return
-
+# Имя менеджера
+@dp.message_handler(state=RequestForm.manager_name)
+async def process_manager_name(message: types.Message, state: FSMContext):
     async with state.proxy() as data:
-        data['manager_phone'] = phone
-
+        data['manager_name'] = message.text
     await RequestForm.contact_name.set()
     await message.reply(
         "<b>Введите контактное лицо</b> (например, имя):",
         parse_mode="HTML"
     )
-    logging.info(f"Пользователь {message.from_user.id} ввел телефон менеджера: {phone}")
-
+    logging.info(f"Пользователь {message.from_user.id} ввел имя менеджера: {message.text}")
 
 # Обработка inline-кнопки для перезапуска
 @dp.callback_query_handler(lambda c: c.data == "restart_request", state="*")
 async def restart_request_callback(callback: types.CallbackQuery, state: FSMContext):
     await state.finish()
-    await RequestForm.manager_phone.set()
+    await RequestForm.manager_name.set()
     await callback.message.answer(
-        "<b>Пожалуйста, введите ваш номер телефона менеджера</b> (например, +998901234567 или 901234567):",
+        "<b>Пожалуйста, введите имя менеджера:</b>",
         parse_mode="HTML"
     )
     await callback.message.delete()
     logging.info(f"Пользователь {callback.from_user.id} перезапустил запрос")
-
 
 # Команда /cancel - полная отмена процесса
 @dp.message_handler(Command('cancel'), state='*')
@@ -237,7 +211,6 @@ async def cancel_process(message: types.Message, state: FSMContext):
         reply_markup=get_restart_button()
     )
     logging.info(f"Пользователь {message.from_user.id} отменил процесс")
-
 
 # Контактное лицо
 @dp.message_handler(state=RequestForm.contact_name)
@@ -251,8 +224,6 @@ async def process_contact_name(message: types.Message, state: FSMContext):
     )
     logging.info(f"Пользователь {message.from_user.id} ввел контактное лицо: {message.text}")
 
-
-# Телефон (ручной ввод)
 @dp.message_handler(state=RequestForm.phone)
 async def process_phone(message: types.Message, state: FSMContext):
     phone = message.text
@@ -272,7 +243,6 @@ async def process_phone(message: types.Message, state: FSMContext):
     )
     logging.info(f"Пользователь {message.from_user.id} ввел телефон: {phone}")
 
-
 # Адрес
 @dp.message_handler(state=RequestForm.address)
 async def process_address(message: types.Message, state: FSMContext):
@@ -285,7 +255,6 @@ async def process_address(message: types.Message, state: FSMContext):
         reply_markup=get_cadastr_keyboard()
     )
     logging.info(f"Пользователь {message.from_user.id} ввел адрес: {message.text}")
-
 
 # Обработка inline-кнопок для кадастрового номера
 @dp.callback_query_handler(lambda c: c.data in ["cadastr_yes", "cadastr_no"], state=RequestForm.cadastr_number)
@@ -303,7 +272,6 @@ async def process_cadastr_choice(callback: types.CallbackQuery, state: FSMContex
     )
     await callback.message.delete()
     logging.info(f"Пользователь {callback.from_user.id} выбрал: {data['has_cadastr']}")
-
 
 # Обработка inline-кнопок для трансформатора
 @dp.callback_query_handler(lambda c: c.data in ["transformer_yes", "transformer_no"], state=RequestForm.has_transformer)
@@ -330,7 +298,6 @@ async def process_transformer_choice(callback: types.CallbackQuery, state: FSMCo
     await callback.message.delete()
     logging.info(f"Пользователь {callback.from_user.id} выбрал трансформатор: {data['has_transformer']}")
 
-
 # Мощность ТП
 @dp.message_handler(state=RequestForm.transformer_power)
 async def process_transformer_power(message: types.Message, state: FSMContext):
@@ -344,7 +311,6 @@ async def process_transformer_power(message: types.Message, state: FSMContext):
     await RequestForm.free_power.set()
     await message.reply("<b>Введите свободную мощность ТП (кВт):</b>", parse_mode="HTML")
     logging.info(f"Пользователь {message.from_user.id} ввел мощность ТП: {power}")
-
 
 # Свободная мощность ТП
 @dp.message_handler(state=RequestForm.free_power)
@@ -360,7 +326,6 @@ async def process_free_power(message: types.Message, state: FSMContext):
     await message.reply("<b>Выберите станцию:</b>", parse_mode="HTML", reply_markup=get_station_keyboard())
     logging.info(f"Пользователь {message.from_user.id} ввел свободную мощность ТП: {free_power}")
 
-
 # Станция
 @dp.callback_query_handler(lambda c: c.data.startswith("station_"), state=RequestForm.station)
 async def process_station(callback: types.CallbackQuery, state: FSMContext):
@@ -375,11 +340,9 @@ async def process_station(callback: types.CallbackQuery, state: FSMContext):
     async with state.proxy() as data:
         data['station'] = station
     await RequestForm.location.set()
-    await callback.message.answer("<b>Отправьте местоположение</b>", parse_mode="HTML",
-                                  reply_markup=get_location_keyboard())
+    await callback.message.answer("<b>Отправьте местоположение</b>", parse_mode="HTML", reply_markup=get_location_keyboard())
     await callback.message.delete()
     logging.info(f"Пользователь {callback.from_user.id} выбрал станцию: {station}")
-
 
 # Местоположение
 @dp.message_handler(content_types=['location'], state=RequestForm.location)
@@ -396,7 +359,6 @@ async def process_location(message: types.Message, state: FSMContext):
     )
     logging.info(f"Пользователь {message.from_user.id} отправил местоположение: {data['location_link']}")
 
-
 @dp.message_handler(state=RequestForm.location)
 async def invalid_location(message: types.Message):
     await message.reply(
@@ -405,7 +367,6 @@ async def invalid_location(message: types.Message):
         reply_markup=get_location_keyboard()
     )
     logging.warning(f"Пользователь {message.from_user.id} отправил неверный формат местоположения")
-
 
 # Фото
 @dp.message_handler(content_types=['photo'], state=RequestForm.photo)
@@ -437,7 +398,7 @@ async def process_photo(message: types.Message, state: FSMContext):
         try:
             sheet = connect_to_google_sheets()
             sheet.append_row([
-                data['manager_phone'],
+                data['manager_name'],
                 current_time,
                 data['contact_name'],
                 data['phone'],
@@ -464,7 +425,7 @@ async def process_photo(message: types.Message, state: FSMContext):
         # Отправка администратору
         admin_message = (
             f"<b>Новый запрос:</b>\n"
-            f"📞 Телефон менеджера: {data['manager_phone']}\n"
+            f"👤 Имя менеджера: {data['manager_name']}\n"
             f"⏰ Время: {current_time}\n"
             f"👤 Контактное лицо: {data['contact_name']}\n"
             f"📞 Телефон: {data['phone']}\n"
@@ -504,5 +465,3 @@ async def invalid_photo(message: types.Message):
         parse_mode="HTML"
     )
     logging.warning(f"Пользователь {message.from_user.id} отправил неверный формат фото")
-
-
