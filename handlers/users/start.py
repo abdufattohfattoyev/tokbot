@@ -2,7 +2,6 @@ import os
 import time
 import logging
 import re
-import json
 from datetime import datetime
 
 import pytz
@@ -23,10 +22,8 @@ from states.Tok_Uchun import RequestForm
 
 # Список администраторов
 ADMINS = [973358587]
-tz = pytz.timezone('Asia/Tashkent')
-# Файл для хранения данных менеджеров
-MANAGER_DATA_FILE = 'manager_data.json'
 
+tz = pytz.timezone('Asia/Tashkent')
 # Настройки логирования
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -169,20 +166,6 @@ def get_station_keyboard():
     return keyboard
 
 
-# Загрузка данных менеджера
-def load_manager_data():
-    if os.path.exists(MANAGER_DATA_FILE):
-        with open(MANAGER_DATA_FILE, 'r') as f:
-            return json.load(f)
-    return {}
-
-
-# Сохранение данных менеджера
-def save_manager_data(data):
-    with open(MANAGER_DATA_FILE, 'w') as f:
-        json.dump(data, f)
-
-
 # Команда /start
 @dp.message_handler(CommandStart())
 async def bot_start(message: types.Message):
@@ -199,24 +182,11 @@ async def bot_start(message: types.Message):
 # Обработка inline-кнопки для начала запроса
 @dp.callback_query_handler(lambda c: c.data == "start_request")
 async def start_request_callback(callback: types.CallbackQuery):
-    manager_data = load_manager_data()
-    user_id = str(callback.from_user.id)
-
-    if user_id in manager_data:
-        # Если у нас уже есть номер менеджера, используем его
-        await RequestForm.contact_name.set()
-        await callback.message.answer(
-            "<b>Введите контактное лицо</b> (например, имя):",
-            parse_mode="HTML"
-        )
-    else:
-        # Если номера нет, запрашиваем его
-        await RequestForm.manager_phone.set()
-        await callback.message.answer(
-            "<b>Пожалуйста, введите ваш номер телефона менеджера</b> (например, +998901234567 или 901234567):",
-            parse_mode="HTML"
-        )
-
+    await RequestForm.manager_phone.set()
+    await callback.message.answer(
+        "<b>Пожалуйста, введите ваш номер телефона менеджера</b> (например, +998901234567 или 901234567):",
+        parse_mode="HTML"
+    )
     await callback.message.delete()
     logging.info(f"Пользователь {callback.from_user.id} начал запрос")
 
@@ -233,11 +203,6 @@ async def process_manager_phone(message: types.Message, state: FSMContext):
         logging.warning(f"Пользователь {message.from_user.id} ввел неверный формат телефона менеджера: {phone}")
         return
 
-    # Сохраняем номер менеджера
-    manager_data = load_manager_data()
-    manager_data[str(message.from_user.id)] = phone
-    save_manager_data(manager_data)
-
     async with state.proxy() as data:
         data['manager_phone'] = phone
 
@@ -253,22 +218,11 @@ async def process_manager_phone(message: types.Message, state: FSMContext):
 @dp.callback_query_handler(lambda c: c.data == "restart_request", state="*")
 async def restart_request_callback(callback: types.CallbackQuery, state: FSMContext):
     await state.finish()
-    manager_data = load_manager_data()
-    user_id = str(callback.from_user.id)
-
-    if user_id in manager_data:
-        await RequestForm.contact_name.set()
-        await callback.message.answer(
-            "<b>Введите контактное лицо</b> (например, имя):",
-            parse_mode="HTML"
-        )
-    else:
-        await RequestForm.manager_phone.set()
-        await callback.message.answer(
-            "<b>Пожалуйста, введите ваш номер телефона менеджера</b> (например, +998901234567 или 901234567):",
-            parse_mode="HTML"
-        )
-
+    await RequestForm.manager_phone.set()
+    await callback.message.answer(
+        "<b>Пожалуйста, введите ваш номер телефона менеджера</b> (например, +998901234567 или 901234567):",
+        parse_mode="HTML"
+    )
     await callback.message.delete()
     logging.info(f"Пользователь {callback.from_user.id} перезапустил запрос")
 
@@ -457,11 +411,6 @@ async def invalid_location(message: types.Message):
 @dp.message_handler(content_types=['photo'], state=RequestForm.photo)
 async def process_photo(message: types.Message, state: FSMContext):
     async with state.proxy() as data:
-        # Получаем номер менеджера из сохраненных данных
-        manager_data = load_manager_data()
-        user_id = str(message.from_user.id)
-        manager_phone = manager_data.get(user_id, "")
-
         # Сохранение фото временно
         photo = message.photo[-1]
         file_info = await bot.get_file(photo.file_id)
@@ -488,7 +437,7 @@ async def process_photo(message: types.Message, state: FSMContext):
         try:
             sheet = connect_to_google_sheets()
             sheet.append_row([
-                manager_phone,  # Используем сохраненный номер менеджера
+                data['manager_phone'],
                 current_time,
                 data['contact_name'],
                 data['phone'],
@@ -515,7 +464,7 @@ async def process_photo(message: types.Message, state: FSMContext):
         # Отправка администратору
         admin_message = (
             f"<b>Новый запрос:</b>\n"
-            f"📞 Телефон менеджера: {manager_phone}\n"
+            f"📞 Телефон менеджера: {data['manager_phone']}\n"
             f"⏰ Время: {current_time}\n"
             f"👤 Контактное лицо: {data['contact_name']}\n"
             f"📞 Телефон: {data['phone']}\n"
@@ -555,4 +504,5 @@ async def invalid_photo(message: types.Message):
         parse_mode="HTML"
     )
     logging.warning(f"Пользователь {message.from_user.id} отправил неверный формат фото")
+
 
