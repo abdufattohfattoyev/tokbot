@@ -15,12 +15,13 @@ from oauth2client.service_account import ServiceAccountCredentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from googleapiclient.errors import HttpError
-
-tz = pytz.timezone('Asia/Tashkent')
-
 from data.config import GOOGLE_CREDENTIALS_FILE, SPREADSHEET_ID, SHEET_NAME, DRIVE_FOLDER_ID
 from loader import dp, bot
 from states.Tok_Uchun import RequestForm
+
+
+tz = pytz.timezone('Asia/Tashkent')
+
 
 # Список администраторов
 ADMINS = [973358587]
@@ -135,7 +136,7 @@ def get_transformer_keyboard():
 # Inline-кнопка для начала запроса
 def get_request_button():
     keyboard = InlineKeyboardMarkup()
-    keyboard.add(InlineKeyboardButton("📝 Запрос отправить", callback_data="start_request"))
+    keyboard.add(InlineKeyboardButton("📝 Начать запрос", callback_data="start_request"))
     return keyboard
 
 # Inline-кнопка для перезапуска
@@ -184,7 +185,7 @@ async def process_manager_name(message: types.Message, state: FSMContext):
         data['manager_name'] = message.text
     await RequestForm.contact_name.set()
     await message.reply(
-        "<b>Введите контактное лицо</b> (например, имя):",
+        "<b>Введите контактное лицо:</b>",
         parse_mode="HTML"
     )
     logging.info(f"Пользователь {message.from_user.id} ввел имя менеджера: {message.text}")
@@ -219,7 +220,7 @@ async def process_contact_name(message: types.Message, state: FSMContext):
         data['contact_name'] = message.text
     await RequestForm.phone.set()
     await message.reply(
-        "<b>Введите контактный телефон</b> (например, +998901234567 или 901234567):",
+        "<b>Введите контактный телефон:</b> (например, +998901234567 или 901234567)",
         parse_mode="HTML"
     )
     logging.info(f"Пользователь {message.from_user.id} ввел контактное лицо: {message.text}")
@@ -229,7 +230,7 @@ async def process_phone(message: types.Message, state: FSMContext):
     phone = message.text
     if not (re.match(r'^\+998[0-9]{9}$', phone) or re.match(r'^[0-9]{9}$', phone)):
         await message.reply(
-            "<b>Пожалуйста, введите телефон в правильном формате</b> (например, +998901234567 или 901234567):",
+            "<b>Пожалуйста, введите телефон в правильном формате:</b> (например, +998901234567 или 901234567)",
             parse_mode="HTML"
         )
         logging.warning(f"Пользователь {message.from_user.id} ввел неверный формат телефона: {phone}")
@@ -238,7 +239,7 @@ async def process_phone(message: types.Message, state: FSMContext):
         data['phone'] = phone
     await RequestForm.address.set()
     await message.reply(
-        "<b>Введите адрес</b> (например, Самарканд):",
+        "<b>Введите адрес:</b> (например, Самарканд)",
         parse_mode="HTML"
     )
     logging.info(f"Пользователь {message.from_user.id} ввел телефон: {phone}")
@@ -291,7 +292,7 @@ async def process_transformer_choice(callback: types.CallbackQuery, state: FSMCo
             data['station'] = ""
             await RequestForm.location.set()
             await callback.message.answer(
-                "<b>Отправьте местоположение</b>",
+                "<b>Отправьте местоположение:</b>",
                 parse_mode="HTML",
                 reply_markup=get_location_keyboard()
             )
@@ -340,7 +341,7 @@ async def process_station(callback: types.CallbackQuery, state: FSMContext):
     async with state.proxy() as data:
         data['station'] = station
     await RequestForm.location.set()
-    await callback.message.answer("<b>Отправьте местоположение</b>", parse_mode="HTML", reply_markup=get_location_keyboard())
+    await callback.message.answer("<b>Отправьте местоположение:</b>", parse_mode="HTML", reply_markup=get_location_keyboard())
     await callback.message.delete()
     logging.info(f"Пользователь {callback.from_user.id} выбрал станцию: {station}")
 
@@ -351,9 +352,9 @@ async def process_location(message: types.Message, state: FSMContext):
         latitude = message.location.latitude
         longitude = message.location.longitude
         data['location_link'] = f"https://maps.google.com/?q={latitude},{longitude}"
-    await RequestForm.photo.set()
+    await RequestForm.location_info.set()
     await message.reply(
-        "<b>Отправьте фото места:</b>",
+        "<b>Введите дополнительную информацию о местоположении:</b> (например, ориентиры, описание места)",
         parse_mode="HTML",
         reply_markup=types.ReplyKeyboardRemove()
     )
@@ -367,6 +368,18 @@ async def invalid_location(message: types.Message):
         reply_markup=get_location_keyboard()
     )
     logging.warning(f"Пользователь {message.from_user.id} отправил неверный формат местоположения")
+
+# Дополнительная информация о местоположении
+@dp.message_handler(state=RequestForm.location_info)
+async def process_location_info(message: types.Message, state: FSMContext):
+    async with state.proxy() as data:
+        data['location_info'] = message.text
+    await RequestForm.photo.set()
+    await message.reply(
+        "<b>Отправьте фото места:</b>",
+        parse_mode="HTML"
+    )
+    logging.info(f"Пользователь {message.from_user.id} ввел дополнительную информацию о местоположении: {message.text}")
 
 # Фото
 @dp.message_handler(content_types=['photo'], state=RequestForm.photo)
@@ -409,7 +422,8 @@ async def process_photo(message: types.Message, state: FSMContext):
                 data['free_power'],
                 data['station'],
                 data['photo_link'],
-                data['location_link']
+                data['location_link'],
+                data['location_info']  # Добавляем новый столбец
             ])
             logging.info(f"Данные записаны в Google Sheets: {message.from_user.id}")
         except Exception as e:
@@ -436,6 +450,7 @@ async def process_photo(message: types.Message, state: FSMContext):
             f"🔋 Свободная мощность ТП: {data['free_power'] or 'Не указано'} кВт\n"
             f"🏭 Станция: {data['station'] or 'Не указано'}\n"
             f"📍 Местоположение: {data['location_link'] or 'Не указано'}\n"
+            f"ℹ Доп. информация: {data['location_info'] or 'Не указано'}\n"
             f"📸 Фото: {data['photo_link'] or 'Не загружено'}"
         )
         for admin_id in ADMINS:
@@ -455,7 +470,6 @@ async def process_photo(message: types.Message, state: FSMContext):
         reply_markup=get_restart_button()
     )
     await state.finish()
-
 
 # Неверный формат фото
 @dp.message_handler(state=RequestForm.photo)
