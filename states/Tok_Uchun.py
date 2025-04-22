@@ -12,4 +12,5 @@ class RequestForm(StatesGroup):
     free_power = State()
     station = State()
     location = State()
+    location_info = State()
     photo = State()
