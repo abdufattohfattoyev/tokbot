@@ -1,6 +1,6 @@
 from aiogram.dispatcher.filters.state import State, StatesGroup
 
-
+# Forma holatlari
 class RequestForm(StatesGroup):
     manager_name = State()
     contact_name = State()
@@ -13,4 +13,5 @@ class RequestForm(StatesGroup):
     station = State()
     location = State()
     location_info = State()
-    photo = State()
+    media_upload = State()
+    change_manager = State()
