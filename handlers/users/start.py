@@ -111,7 +111,7 @@ def upload_to_drive(file_path, mime_type, folder_id):
             'name': os.path.basename(file_path),
             'parents': [folder_id]
         }
-        media = MediaFileUpload(file_path, mimetype=mime_type)
+        media = MediaFileUpload(file_path, mimetype=mime_type, resumable=True, chunksize=1024*1024)
         file = drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
         file_id = file.get('id')
         drive_service.permissions().create(
